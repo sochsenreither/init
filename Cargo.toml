@@ -1,0 +1,33 @@
+[package]
+name = "init"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mio = "1"
+libc = "0.2"
+rand = "0.8"
+log = "0.4"
+env_logger = "0.10"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.6"
+
+[[bin]]
+name = "init"
+path = "src/init/main.rs"
+
+[[bin]]
+name = "serviceA"
+path = "src/serviceA/main.rs"
+
+[[bin]]
+name = "serviceB"
+path = "src/serviceB/main.rs"
+
+[[bin]]
+name = "serviceC"
+path = "src/serviceC/main.rs"
+
+[[bin]]
+name = "ping"
+path = "src/ping/main.rs"
