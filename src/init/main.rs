@@ -15,7 +15,7 @@ use mio::{net::UnixListener, Events, Interest, Poll, Token};
 
 const LISTENER: Token = Token(0);
 
-// Service name -> (socket, already_started)
+// Service name -> socket
 type ServiceMap = BTreeMap<&'static str, &'static str>;
 
 // Initialized only once. We can't register services at runtime, which we probably don't want anyway.
@@ -29,9 +29,8 @@ async fn main() {
     // Open all file descriptors.
     for (service, socket) in SERVICE_MAP.read().unwrap().iter() {
         // socket_listener will call service_spawner, which might eventually call spawn_service, which write locks
-        // SERVICE_MAP. This is not a problem, since before dropping this log, no other process might so a service
-        // request, which will trigger spawn_service, since no other process can't run at this point (remember we
-        // are init).
+        // SERVICE_MAP. This is not a problem, since before dropping this read lock, no other process might do a
+        // service request, which will trigger spawn_service, since no other process can't run at this point.
         socket_listener(service, socket).await;
     }
 
@@ -41,10 +40,10 @@ async fn main() {
     // all.
 
     // Since these services all use socket activation, we can just start them in parallel and don't have to worry
-    // about dependencies.
-    start_service("serviceA");
-    start_service("serviceB");
-    start_service("serviceC");
+    // about dependencies. Or not start them at all, so they are started on-demand.
+    // start_service("serviceA");
+    // start_service("serviceB");
+    // start_service("serviceC");
 
     // Note that the information from waitpid allows us to restart services (e.g., by notifying the async task
     // responsible for starting that service).
@@ -77,8 +76,7 @@ fn start_service(service: &'static str) {
 ///
 /// Once a connections comes in, a service is started that will handle the connection.
 /// The created Listener is moved into the async task and will be dropped, once that task returns. This will be after
-/// forking the service, so dropping is ok. If we implement automatic restarting of services that file descriptor would
-/// need to stay open.
+/// forking the service, so dropping is ok.
 ///
 /// Note that this assumes services never die. Once we spawned the service we just return.
 /// If we want dynamic restarting this listener needs to continously listen to the socket in order to be able to
@@ -124,8 +122,8 @@ async fn service_spawner(service: &'static str, listener: &mut UnixListener) {
 ///
 /// This is done with a combination of fork and exec. Should probably be done with posix_spawn.
 ///
-/// Unsets FD_CLOEXEC for the file descriptor we want to pass and makes it blocking (this is just by convention and
-/// because the POC only supports blocking UnixListeners currently).
+/// Unsets FD_CLOEXEC for the file descriptor we want to pass and makes it blocking (so for the service it looks like
+/// a normal blocking UnixListener).
 fn spawn_service(service: &'static str, socket: RawFd) {
     match unsafe { libc::fork() } {
         -1 => panic!("fork failed"),
@@ -154,8 +152,7 @@ fn unset_cloexec(fd: RawFd) {
 
     // Unset FD_CLOEXEC.
     let new_flags = flags & !libc::FD_CLOEXEC;
-    let res = unsafe { libc::fcntl(fd, libc::F_SETFD, new_flags) };
-    assert_ne!(res, -1);
+    assert_ne!(unsafe { libc::fcntl(fd, libc::F_SETFD, new_flags) }, -1);
 }
 
 /// Set the file descriptor to blocking.

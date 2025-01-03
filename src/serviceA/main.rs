@@ -7,15 +7,17 @@ use init::Worker;
 use tokio::time::sleep;
 
 // We don't manually bind, instead we just receive the fd from init.
-const _SOCKET: &'static str = "service_a_socket";
+const SOCKET: &'static str = "service_a_socket";
 
 #[tokio::main]
 async fn main() {
     setup().await;
 
-    // We use socket activation, so lets receive the fd from init!
-    // let listener = UnixListener::bind(_SOCKET).unwrap();
-    let listener = unsafe { UnixListener::from_raw_fd(init::init_get_fd().unwrap()) };
+    // Works with and without socket activation.
+    let listener = match init::init_get_fd() {
+        Ok(raw_fd) => unsafe { UnixListener::from_raw_fd(raw_fd) },
+        Err(_) => UnixListener::bind(SOCKET).unwrap(),
+    };
 
     loop {
         let (stream, _address) = listener.accept().unwrap();
@@ -29,6 +31,7 @@ async fn main() {
 
 /// Requests an answer from service B.
 fn request_b() {
+    log::trace!("A needs data from B");
     init::request("service_b_socket");
 }
 

@@ -28,7 +28,7 @@ impl std::fmt::Debug for Error {
 /// use init::init_get_fd;
 ///
 /// let Ok(socket_fd) = init_get_fd() else {
-///     // Do something to recover
+///     // handle error
 /// }
 /// let socket = unsafe { UnixStream::from_raw_fd(socket_fd) };
 /// socket.write_all(b"Hello, world!").unwrap();

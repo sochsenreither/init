@@ -33,5 +33,6 @@ async fn setup() {
     sleep(Duration::from_secs(2)).await;
 
     // This service needs data from serviceA for its setup. Will fail if serviceA is not up.
+    log::trace!("B needs data from C for setup");
     init::request("service_c_socket");
 }
